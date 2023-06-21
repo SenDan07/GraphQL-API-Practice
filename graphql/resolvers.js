@@ -105,6 +105,7 @@ module.exports = {
     });
     const createdPost = await post.save();
     user.posts.push(createdPost);
+    user.save();
     // Add posts to users' list of posts
     return {
       ...createdPost._doc,
