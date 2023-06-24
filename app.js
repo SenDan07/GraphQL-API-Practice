@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
@@ -12,6 +11,7 @@ const { graphqlHTTP } = require('express-graphql');
 const graphqlSchema = require('./graphql/schema');
 const graphqlResolver = require('./graphql/resolvers');
 const auth = require('./middleware/auth');
+const { clearImage } = require('./util/file');
 
 const { DB_URL } = process.env;
 
@@ -61,8 +61,8 @@ app.use((req, res, next) => {
 app.use(auth);
 
 app.put('/post-image', (req, res, next) => {
-  if(!req.isAuth){
-    throw new Error('Not authenticated.')
+  if (!req.isAuth) {
+    throw new Error('Not authenticated.');
   }
   if (!req.file) {
     return res.status(200).json({ message: 'No file provided' });
@@ -70,9 +70,10 @@ app.put('/post-image', (req, res, next) => {
   if (req.body.oldPath) {
     clearImage(req.body.oldPath);
   }
-  return res
-    .status(201)
-    .json({ message: 'File stored successfully', filePath: req.file.path });
+  return res.status(201).json({
+    message: 'File stored successfully',
+    filePath: req.file.path.replace('\\', '/'),
+  });
 });
 
 //Unlike REST APIs which makes use of several routes, in GraphQL this is the only endpoint we'll provide
@@ -91,10 +92,21 @@ app.use(
     //   const code = err.originalError.code || 500;
     //   return { message: message, status: code, data: data };
     // },
+    // customFormatErrorFn: (error) => ({
+    //   message: error.message || 'An error occurred.',
+    //   code: error.originalError.code || 500,
+    //   data: error.originalError.data,
+    // }),
     customFormatErrorFn: (error) => ({
       message: error.message || 'An error occurred.',
-      code: error.originalError.code || 500,
-      data: error.originalError.data,
+      code:
+        error.originalError && error.originalError.code
+          ? error.originalError.code
+          : 500,
+      data:
+        error.originalError && error.originalError.data
+          ? error.originalError.data
+          : null,
     }),
   })
 );
@@ -116,8 +128,3 @@ mongoose
   .catch((err) => {
     console.log(err);
   });
-
-const clearImage = (filePath) => {
-  filePath = path.join(__dirname, '..', filePath);
-  fs.unlink(filePath, (err) => console.log(err));
-};
